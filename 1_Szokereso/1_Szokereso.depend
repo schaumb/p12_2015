@@ -1,0 +1,11 @@
+# depslib dependency file v1.0
+1444901715 source:c:\users\komonyi\documents\programozas\verseny\12_oras_programozo_verseny_2015\donto\trunk\1_szokereso\main.cpp
+	<iostream>
+	<fstream>
+	<vector>
+	<list>
+	<algorithm>
+	<set>
+	<tuple>
+	<locale>
+
