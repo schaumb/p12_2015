@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cassert>
+#include <vector>
+#include <sstream>
 
 #ifndef WIN32
 void gotoxy(int x, int y)
@@ -23,6 +25,8 @@ static std::string clr(100, ' ');
 
 class BigNum {
 public:
+    BigNum(std::ostream& o = std::cout) : outp(&o) {}
+
     BigNum& operator=(const std::string& str) {
         auto it = str.begin();
 
@@ -59,9 +63,11 @@ public:
 
     BigNum& operator+=(char c) {
         number = c + number;
+        return *this;
     }
 
     std::string number;
+    std::ostream* outp;
 };
 
 void prettyUnder(const BigNum& lhs, const BigNum& rhs, const BigNum& result, char op, size_t maxSize, size_t where, std::ostream& out = std::cout) {
@@ -82,22 +88,29 @@ void prettyUnder(const BigNum& lhs, const BigNum& rhs, const BigNum& result, cha
     gotoxy(1, 8);
 }
 
-void prettyMul(const BigNum& lhs, const BigNum& rhs, const BigNum& result, char op, size_t maxSize, size_t where, std::ostream& out = std::cout) {
-    /*gotoxy(1, 1);
+void prettyMul(const BigNum& lhs, const BigNum& rhs, const std::vector<BigNum>& result, char op, size_t where, std::ostream& out = std::cout) {
+    gotoxy(1, 1);
     out << "Calculating " << lhs.number << " " << op << " " << rhs.number << clr << std::endl;
 
+    auto step = lhs.number.size();
     gotoxy(1, 3);
-    out << std::string(maxSize - where, ' ') << '|' << clr << std::endl;
+    out << std::string(lhs.number.size() - where % step, ' ') << '|' <<
+            std::string(where % step + 1, ' ') <<
+            std::string(where / step, ' ') << '|' << clr << std::endl;
     gotoxy(1, 4);
-    lhs.print(maxSize - lhs.number.size(), out) << clr << std::endl;
-    gotoxy(1, 5);
+    lhs.print(1, out);
     out << op;
-    rhs.print(maxSize - rhs.number.size() - 1, out) << clr << std::endl;
-    gotoxy(1, 6);
-    out << std::string(maxSize, '-') << clr << std::endl;
-    gotoxy(1, 7);
-    result.print(maxSize - result.number.size(), out) << clr << std::endl;
-    gotoxy(1, 8);*/
+    rhs.print(0, out) << clr << std::endl;
+    gotoxy(1, 5);
+    out << std::string(step + 2 + rhs.number.size(), '-') << clr;
+    for(auto i = 0UL; i < result.size(); ++i) {
+        gotoxy(1, i+6);
+        auto& bnum = result.at(i);
+        bnum.print(step + rhs.number.size() - bnum.number.size()) << clr;
+    }
+    gotoxy(1, 6 + result.size());
+    out << std::string(lhs.number.size() - 1 - where % step + result.size(), ' ') << '|' << clr;
+    gotoxy(1, 7 + result.size());
 }
 
 void printOp(char nd1, char nd2, char op, int rem, int result, std::ostream& out, char op2 = -1) {
@@ -136,8 +149,8 @@ bool operator<(const BigNum& lhs, const BigNum& rhs) {
 }
 
 BigNum operator+(const BigNum& lhs, const BigNum& rhs) {
-    BigNum result;
-    std::ostream& out = std::cout;
+    BigNum result(*lhs.outp);
+    std::ostream& out = *lhs.outp;
     std::size_t maxSize = std::max(lhs.number.size(), rhs.number.size()) + 1;
 
     bool remainder = false;
@@ -185,7 +198,9 @@ BigNum operator+(const BigNum& lhs, const BigNum& rhs) {
         }
 
         remainder = next > 9;
-        std::cin.get();
+        if(out == &std::cout) {
+            std::cin.get();
+        }
     }
 
     return result;
@@ -199,12 +214,14 @@ BigNum operator-(const BigNum& lhsx, const BigNum& rhsx) {
     const BigNum& rhs(swapped ? lhsx : rhsx);
 
     BigNum result;
-    std::ostream& out = std::cout;
+    std::ostream& out = *lhsx.outp;
 
     if(swapped) {
         gotoxy(1, 1);
         out << "The first argument is smaller. We switch the arguments, and negate the result." << std::endl;
-        std::cin.get();
+        if(out == &std::cout) {
+            std::cin.get();
+        }
     }
 
 
@@ -262,7 +279,9 @@ BigNum operator-(const BigNum& lhsx, const BigNum& rhsx) {
         }
 
         remainder = next < 0;
-        std::cin.get();
+        if(out == &std::cout) {
+            std::cin.get();
+        }
     }
     if(swapped) {
         out << "We negate the result." << std::endl;
@@ -274,21 +293,63 @@ BigNum operator-(const BigNum& lhsx, const BigNum& rhsx) {
 
 
 BigNum operator*(const BigNum& lhs, const BigNum& rhs) {
-    std::ostream& out = std::cout;
+    std::ostream& out = *lhs.outp;
+    std::vector<BigNum> halfResults;
+    int remainder = 0;
 
-    std::size_t maxSize = lhs.number.size() + rhs.number.size() + 1;
-    lhs.print(1, out) << '*';
-    rhs.print(0, out);
+    for(auto i = 0UL; i < rhs.number.size(); ++i) {
+        halfResults.emplace_back();
+        halfResults.back().number = std::string(rhs.number.size() - i - 1, '0');
+        remainder = 0;
+        auto itl = lhs.number.rbegin();
+        for(auto j = 0UL; j < lhs.number.size(); ++j, ++itl) {
 
+            int next = (*itl - '0') * (rhs.number[i] - '0') + remainder;
 
-    return lhs;
+            if(remainder) {
+                halfResults.back().number.front() = next % 10 + '0';
+            }
+            else {
+                halfResults.back() += next % 10 + '0';
+            }
+
+            if(next > 9) {
+                halfResults.back() += (next / 10) + '0';
+            }
+
+            prettyMul(lhs, rhs, halfResults, '*', i * lhs.number.size() + j, out);
+            printOp(*itl, rhs.number[i], '*', remainder, next, out, '+');
+
+            remainder = next / 10;
+
+            std::cin.get();
+        }
+    }
+
+    std::stringstream ss;
+    BigNum result(ss);
+    result.number = "0";
+    for(BigNum& half : halfResults) {
+        result = result + half;
+    }
+
+    prettyMul(lhs, rhs, halfResults, '*', rhs.number.size() * lhs.number.size() - 1, out);
+
+    gotoxy(1, 5 + rhs.number.size());
+    out << "+";
+    gotoxy(1, 6 + rhs.number.size());
+
+    auto max = lhs.number.size() + rhs.number.size();
+    out << std::string(max, '-') << clr << std::endl;
+    gotoxy(1, 7 + rhs.number.size());
+    result.print(max - result.number.size(),out) << clr << std::endl;
+
+    return result;
 }
 
 BigNum operator/(const BigNum& lhs, const BigNum& rhs) {
-    std::ostream& out = std::cout;
+    std::ostream& out = *lhs.outp;
 
-    lhs.print(0, out) << '/';
-    rhs.print(0, out) << '=';
 
     return lhs;
 }
@@ -339,6 +400,7 @@ int main()
         }
         std::cout << "Result is: ";
 
-        result.print() << std::endl;
+        result.print() << std::endl << std::endl;
+        std::cout << " next : ";
     }
 }
