@@ -52,12 +52,78 @@ public:
     }
     friend BigNum abs(BigNum&& bn);
     friend BigNum operator-(const BigNum& lhs, const BigNum& rhs);
+    friend BigNum operator+(const BigNum& lhs, const BigNum& rhs);
     friend BigNum operator*(const BigNum& lhs, const BigNum& rhs);
     friend std::pair<BigNum, BigNum> operator/(const BigNum& lhs, const BigNum& rhs);
     friend bool operator<(const BigNum& lhs, const BigNum& rhs);
 
+    friend bool operator!=(const BigNum& lhs, const BigNum& rhs) {
+        return lhs < rhs || rhs < lhs;
+    }
+
     BigNum sqrt(std::ostream& out = std::cout) {
-        return *this;
+        std::stringstream ss;
+        static BigNum two(std::cout, "2");
+        two.outp = &ss;
+        this->outp = &ss;
+
+
+        auto lambda = [this](const BigNum& num) {
+            auto doublenum = (num * two);
+            auto result = *this / doublenum;
+            auto result2 = num / two;
+            auto doubledouble = doublenum * two;
+
+            auto first = result.second * doubledouble ;
+            auto second = result2.second * doubledouble;
+
+            auto nev = first + second;
+
+            auto div = nev / doubledouble;
+
+            if(doublenum < div.second) {
+                ++div.first;
+            }
+            return result.first + result2.first; // + div.first;
+        };
+        BigNum bn = *this, bn2;
+        bn.outp = &ss;
+        int nth = 0;
+        bool quit = false;
+        while(!quit && bn != (bn2 = lambda(bn))) {
+            gotoxy(1, 1);
+            out << "We use converge algorithm x_n+1 = x_n / 2 + a / (x_n * 2)" << clr << std::endl;
+
+            gotoxy(1, 2);
+            out <<  "(inaccurate, because these are natural numbers, you can stop this with 'q')" << clr;
+            gotoxy(1, 3);
+            out << clr;
+            gotoxy(1, 3);
+            out << ++nth << ". step: " << bn2.number << " = " << bn.number << " / 2 + " << this->number << " / " << " (" << bn.number << " * 2) " << clr << std::endl;
+            switch(std::cin.get()) {
+            case 'q' :
+                out << "quited\n";
+                quit = true;
+                break;
+            default:
+                break;
+            }
+
+            bn = bn2;
+        }
+
+        gotoxy(1, 1);
+        out << "We used converge algorithm x_n+1 = x_n / 2 + a / (x_n * 2)" << clr << std::endl;
+
+        gotoxy(1, 2);
+        out << clr;
+        gotoxy(1, 3);
+        out << clr;
+        gotoxy(1, 3);
+        std::cout << ++nth << ". step: " << bn2.number << " = " << " (" << bn.number << " + " << this->number << " / " << bn.number << ") / 2" << clr << std::endl;
+        std::cin.get();
+
+        return bn;
     }
 
     std::ostream& print(std::size_t prevSpaces = 0, std::ostream& out = std::cout) const {
@@ -134,7 +200,7 @@ void prettyMul(const BigNum& lhs, const BigNum& rhs, const std::vector<BigNum>& 
     for(auto i = 0UL; i < result.size(); ++i) {
         gotoxy(1, i+6);
         auto& bnum = result.at(i);
-        bnum.print(step + rhs.number.size() - bnum.number.size()) << clr;
+        bnum.print(step + rhs.number.size() - bnum.number.size(), out) << clr;
     }
     gotoxy(1, 6 + result.size());
     out << std::string(lhs.number.size() - 1 - where % step + result.size(), ' ') << '|' << clr;
@@ -407,7 +473,6 @@ BigNum operator*(const BigNum& lhs, const BigNum& rhs) {
 
 
 void prettyDiv(const BigNum& lhs, const BigNum& rhs, const std::vector<BigNum>& remainders, const BigNum& result, std::size_t pg, std::ostream& out = std::cout) {
-    gotoxy(1, 1);
     out << "Calculating " << lhs.number << " / " << rhs.number << clr << std::endl;
 
     gotoxy(1, 3);
@@ -417,7 +482,7 @@ void prettyDiv(const BigNum& lhs, const BigNum& rhs, const std::vector<BigNum>& 
     for(auto i = 0UL; i < remainders.size(); ++i) {
         gotoxy(1, i+5);
         auto& bnum = remainders.at(i);
-        bnum.print(i + 1 - bnum.number.size()) << clr;
+        bnum.print(i + 1 - bnum.number.size(), out) << clr;
     }
     gotoxy(1, 5 + remainders.size());
     out << clr;
@@ -524,6 +589,7 @@ std::pair<BigNum, BigNum> operator/(const BigNum& lhs, const BigNum& rhs) {
     remainders.back().number.push_back(' ');
     prettyDiv(lhs, rhs, remainders, result, i, out);
     remainders.back().number.pop_back();
+    remainders.back().outp = lhs.outp;
     return std::make_pair(result, remainders.back());
 }
 
