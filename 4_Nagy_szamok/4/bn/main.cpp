@@ -5,7 +5,7 @@
 #include <fstream>
 #include <tuple>
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(_WIN32)
 void gotoxy(int x, int y)
 {
   printf("\033[%d;%df", y, x);

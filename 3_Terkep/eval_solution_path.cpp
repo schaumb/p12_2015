@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstdint>
 #include <cmath>
+#include <climits>
 
 using std::vector;
 using std::cerr;
